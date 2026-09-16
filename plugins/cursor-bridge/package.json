@@ -1,0 +1,25 @@
+{
+  "name": "cursor-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server that hands tasks to Cursor agents (local read-only or cloud) and returns the final reply.",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/zzzare/cursor-bridge.git", "directory": "plugins/cursor-bridge" },
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "cursor-bridge-mcp": "server/launch.mjs"
+  },
+  "scripts": {
+    "start": "node server/launch.mjs",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@cursor/sdk": "1.0.31",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "3.25.76"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "cursor-bridge",
+  "version": "0.1.0",
+  "description": "Hand tasks to Cursor agents and get their final reply back: local read-only reviews of uncommitted work, or cloud agents on a branch.",
+  "author": { "name": "Zare Manojlovic" },
+  "homepage": "https://github.com/zzzare/cursor-bridge",
+  "repository": "https://github.com/zzzare/cursor-bridge",
+  "license": "MIT",
+  "keywords": ["cursor", "mcp", "agents", "code-review", "second-opinion"],
+  "userConfig": {
+    "cursor_api_key": {
+      "type": "string",
+      "title": "Cursor API key (optional)",
+      "description": "Leave empty to sign in with your Cursor account in the browser instead (ask Claude to sign in to Cursor). Or paste a key from Cursor Dashboard > API Keys. Runs bill the account behind the key.",
+      "sensitive": true,
+      "required": false
+    },
+    "default_model": {
+      "type": "string",
+      "title": "Default model",
+      "description": "Used when a call names no model, e.g. composer-2.5 or grok-4.6:effort=high. Ask Claude to run cursor_models for the list.",
+      "default": "composer-2.5"
+    },
+    "allow_local_writes": {
+      "type": "boolean",
+      "title": "Allow local write access",
+      "description": "Lets a local Cursor agent edit files and run commands on this machine when a call asks for access \"full\". Leave off unless you need it.",
+      "default": false
+    }
+  },
+  "mcpServers": {
+    "cursor": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/launch.mjs"],
+      "env": {
+        "CURSOR_BRIDGE_API_KEY": "${user_config.cursor_api_key}",
+        "CURSOR_BRIDGE_DEFAULT_MODEL": "${user_config.default_model}",
+        "CURSOR_BRIDGE_ALLOW_LOCAL_WRITES": "${user_config.allow_local_writes}",
+        "CURSOR_BRIDGE_DATA_DIR": "${CLAUDE_PLUGIN_DATA}"
+      }
+    }
+  }
+}

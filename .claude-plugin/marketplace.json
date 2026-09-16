@@ -1,0 +1,16 @@
+{
+  "name": "cursor-bridge",
+  "owner": { "name": "Zare Manojlovic" },
+  "description": "Claude Code plugin that hands tasks to Cursor agents and returns their reply.",
+  "plugins": [
+    {
+      "name": "cursor-bridge",
+      "source": "./plugins/cursor-bridge",
+      "description": "Hand tasks to Cursor agents and get their final reply back: local read-only reviews of uncommitted work, or cloud agents on a branch.",
+      "category": "development",
+      "homepage": "https://github.com/zzzare/cursor-bridge",
+      "license": "MIT",
+      "keywords": ["cursor", "mcp", "agents", "code-review"]
+    }
+  ]
+}
