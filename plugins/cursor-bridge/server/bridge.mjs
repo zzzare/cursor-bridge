@@ -47,9 +47,23 @@ function defaultModelFrom(env) {
 
 // The plugin passes its setting as CURSOR_BRIDGE_API_KEY rather than CURSOR_API_KEY: an empty setting would otherwise overwrite
 // a CURSOR_API_KEY the user already has in their environment. With no key at all, the SDK uses a stored browser sign-in.
-export function resolveApiKey(env = process.env, readUserEnv = readWindowsUserEnvKey) {
-  return envValue(env, "CURSOR_BRIDGE_API_KEY") ?? envValue(env, "CURSOR_API_KEY") ?? envValue(env, "CLAUDE_PLUGIN_OPTION_CURSOR_API_KEY") ?? readUserEnv();
+const KEY_SOURCES = [
+  ["CURSOR_BRIDGE_API_KEY", "the plugin setting"],
+  ["CURSOR_API_KEY", "the CURSOR_API_KEY environment variable"],
+  ["CLAUDE_PLUGIN_OPTION_CURSOR_API_KEY", "the plugin setting"],
+];
+
+/** The configured API key and a description of where it came from, or undefined when only a browser sign-in could apply. */
+export function resolveApiKeySource(env = process.env, readUserEnv = readWindowsUserEnvKey) {
+  for (const [name, source] of KEY_SOURCES) {
+    const key = envValue(env, name);
+    if (key) return { key, source };
+  }
+  const key = readUserEnv();
+  return key ? { key, source: "the CURSOR_API_KEY Windows user environment variable (read from the registry)" } : undefined;
 }
+
+export const resolveApiKey = (env = process.env, readUserEnv = readWindowsUserEnvKey) => resolveApiKeySource(env, readUserEnv)?.key;
 
 // A key saved as a Windows user variable after the MCP client started is not in this process's environment yet.
 export function readWindowsUserEnvKey() {
@@ -190,14 +204,20 @@ const isSettled = entry => entry.result !== undefined || entry.error !== undefin
 const day = ms => new Date(ms).toISOString().slice(0, 10);
 
 export function describeError(error) {
-  const code = error?.code ? ` [${error.code}]` : "";
+  const message = error?.message ?? String(error);
+  // Cursor messages often already carry their code in brackets; don't repeat it.
+  const code = error?.code && !message.includes(`[${error.code}]`) ? ` [${error.code}]` : "";
+  const repo = message.match(/does not have access to repository (\S+)/i)?.[1]?.replace(/[.,;:]+$/, "");
   let hint = "";
   if (error?.name === "AuthenticationError" || error?.code === "unauthenticated") hint = ' Sign in with cursor_auth (action "login") or set an API key in the plugin settings or CURSOR_API_KEY.';
   else if (error?.name === "IntegrationNotConnectedError") hint = ` Connect ${error.provider} to Cursor: ${error.helpUrl}`;
+  else if (repo || error?.code === "repository_access") {
+    hint = ` Cursor's git integration cannot see ${repo ?? "that repository"}. Grant it access (on GitHub: Settings > Applications > Installed GitHub Apps > Cursor > Configure > Repository access), or use a repository Cursor can already see.`;
+  }
   else if (error?.name === "AgentBusyError") hint = " That agent still has an active run; use cursor_wait or cursor_cancel.";
   else if (error?.name === "RateLimitError") hint = " Cursor rate limited the request; wait a minute and retry.";
   else if (error?.code === "feature_unavailable") hint = " Cursor does not offer this for the account behind the API key.";
-  return `${error?.message ?? String(error)}${code}${hint}`;
+  return `${message}${code}${hint}`;
 }
 
 async function dispose(agent) {
@@ -278,6 +298,10 @@ export class CursorBridge {
 
   #apiKey() {
     return resolveApiKey(this.env, this.readUserEnv);
+  }
+
+  #keySource() {
+    return resolveApiKeySource(this.env, this.readUserEnv);
   }
 
   async runLocal(args, extra) {
@@ -385,10 +409,11 @@ export class CursorBridge {
   }
 
   async models() {
-    const apiKey = this.#apiKey();
+    const configured = this.#keySource();
+    const apiKey = configured?.key;
     const [me, models] = await Promise.all([this.sdk.Cursor.me({ apiKey }), this.sdk.Cursor.models.list({ apiKey })]);
     const lines = [
-      `API key "${me.apiKeyName}" works.`,
+      `API key "${me.apiKeyName}" works (from ${configured?.source ?? "the stored Cursor sign-in"}).`,
       `Server default model: ${modelLabel(this.config.defaultModel)}. Local write access: ${this.config.allowLocalWrites ? "allowed" : "off"}.`,
       "",
       "Models (pass as model; params go after a colon, e.g. grok-4.6:effort=high):",
@@ -408,10 +433,10 @@ export class CursorBridge {
       return { text: "Removed the stored Cursor sign-in from this machine. The key it created stays valid until it expires; revoke it at Cursor Dashboard > API Keys if needed." };
     }
     if (action === "login") return this.#signIn(waitSeconds, extra);
-    const configured = this.#apiKey() !== undefined;
+    const configured = this.#keySource();
     const stored = await this.sdk.Cursor.auth.status();
     const lines = [];
-    if (configured) lines.push("Using an API key from the plugin setting or the CURSOR_API_KEY environment variable. cursor_models checks that it works.");
+    if (configured) lines.push(`Using the API key from ${configured.source}. cursor_models checks that it works.`);
     if (stored.status === "logged-in") {
       const who = stored.email ? ` as ${stored.email}` : "";
       const expires = stored.apiKeyExpiresAtMs ? `; its key expires ${day(stored.apiKeyExpiresAtMs)}` : "";
@@ -453,7 +478,8 @@ export class CursorBridge {
     if (login.result) {
       const who = login.result.email ? ` as ${login.result.email}` : "";
       const expires = login.result.expiresAtMs ? ` Its key expires ${day(login.result.expiresAtMs)}.` : "";
-      const note = this.#apiKey() !== undefined ? " A configured API key still takes precedence over this sign-in." : "";
+      const configured = this.#keySource();
+      const note = configured ? ` The API key from ${configured.source} still takes precedence over this sign-in.` : "";
       return { text: `Signed in with Cursor${who}. The key is stored on this machine in ~/.cursor/sdk/auth.json.${expires}${note}` };
     }
     return { text: loginPrompt(login) };

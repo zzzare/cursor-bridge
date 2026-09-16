@@ -101,8 +101,9 @@ Models are written as `id` or `id:param=value,...`, for example `grok-4.6:effort
 
 - **The cursor server fails to connect in your first session after installing.** Its dependencies (about 28 MB) may still be installing. Claude Code's automatic install stops after 60 seconds, and the server then installs them itself on its first start. Start a new session. If it still fails, run `npm ci --omit=dev` once in the plugin folder, `~/.claude/plugins/cache/cursor-bridge/cursor-bridge/<version>/`, and start a new session.
 - **The server reports that Node is too old.** Install Node.js 22.13 or newer, then start a new session.
-- **Authentication errors.** Ask Claude to run `cursor_auth`: `status` shows what is configured, `login` signs in with your Cursor account. Or set the API key in the plugin settings.
+- **Authentication errors.** Ask Claude to run `cursor_auth`: `status` shows which API key is used and where it comes from, `login` signs in with your Cursor account. Or set the API key in the plugin settings.
 - **A cloud run says the integration is not connected.** Connect GitHub (or your git host) in Cursor. The error includes a link to the right page.
+- **A cloud run says the integration does not have access to the repository.** Cursor's GitHub app only sees the repositories you allowed. On GitHub, open Settings > Applications > Installed GitHub Apps > Cursor > Configure and add the repository, or run the agent on a repository Cursor can already see.
 
 ## Development
 

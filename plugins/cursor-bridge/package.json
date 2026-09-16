@@ -1,10 +1,14 @@
 {
   "name": "cursor-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server that hands tasks to Cursor agents (local read-only or cloud) and returns the final reply.",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/zzzare/cursor-bridge.git", "directory": "plugins/cursor-bridge" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zzzare/cursor-bridge.git",
+    "directory": "plugins/cursor-bridge"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.13"

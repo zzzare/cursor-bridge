@@ -6,8 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, test } from "node:test";
 import {
-  BridgeError, clampWait, cloudRepos, CursorBridge, envValue, FALLBACK_MODEL, formatDuration, loadConfig, normalizeRepoUrl, parseModelSpec,
-  READ_ONLY_TOOLS, resolveApiKey, toolsForAccess,
+  BridgeError, clampWait, cloudRepos, CursorBridge, describeError, envValue, FALLBACK_MODEL, formatDuration, loadConfig, normalizeRepoUrl,
+  parseModelSpec, READ_ONLY_TOOLS, resolveApiKey, resolveApiKeySource, toolsForAccess,
 } from "../server/bridge.mjs";
 
 const tempDirs = [];
@@ -95,6 +95,24 @@ describe("parsing and config", () => {
     assert.equal(resolveApiKey({ CURSOR_BRIDGE_API_KEY: "from-plugin", CURSOR_API_KEY: "from-env" }), "from-plugin");
     assert.equal(resolveApiKey({ CURSOR_BRIDGE_API_KEY: "", CURSOR_API_KEY: "from-env" }), "from-env");
     assert.equal(resolveApiKey({ CURSOR_BRIDGE_API_KEY: "${user_config.cursor_api_key}", CLAUDE_PLUGIN_OPTION_CURSOR_API_KEY: "from-option" }), "from-option");
+  });
+
+  test("resolveApiKeySource names where the key came from", () => {
+    const none = () => undefined;
+    assert.equal(resolveApiKeySource({ CURSOR_BRIDGE_API_KEY: "a" }, none).source, "the plugin setting");
+    assert.equal(resolveApiKeySource({ CURSOR_API_KEY: "b" }, none).source, "the CURSOR_API_KEY environment variable");
+    assert.equal(resolveApiKeySource({ CLAUDE_PLUGIN_OPTION_CURSOR_API_KEY: "c" }, none).source, "the plugin setting");
+    const registry = resolveApiKeySource({ CURSOR_BRIDGE_API_KEY: "" }, () => "from-registry");
+    assert.deepEqual(registry, { key: "from-registry", source: "the CURSOR_API_KEY Windows user environment variable (read from the registry)" });
+    assert.equal(resolveApiKeySource({}, none), undefined);
+  });
+
+  test("describeError explains missing repository access without repeating the code", () => {
+    const error = Object.assign(new Error("[validation_error] The SCM integration does not have access to repository zzzare/cursor-bridge to verify branch existence."), { code: "validation_error" });
+    const text = describeError(error);
+    assert.match(text, /Cursor's git integration cannot see zzzare\/cursor-bridge\. Grant it access/);
+    assert.equal(text.split("[validation_error]").length - 1, 1);
+    assert.match(describeError(Object.assign(new Error("no access"), { code: "repository_access" })), /cannot see that repository/);
   });
 
   test("loadConfig defaults and overrides", () => {
@@ -258,7 +276,8 @@ describe("CursorBridge with a fake SDK", () => {
 
   test("auth status reports a configured key, a stored sign-in, or neither", async () => {
     const { sdk } = fakeSdk();
-    assert.match((await newBridge(sdk).auth()).text, /Using an API key/);
+    assert.match((await newBridge(sdk).auth()).text, /Using the API key from the CURSOR_API_KEY environment variable/);
+    assert.match((await newBridge(sdk, { CURSOR_BRIDGE_API_KEY: "from-plugin" }).auth()).text, /Using the API key from the plugin setting/);
     assert.match((await newBridge(sdk, {}, { withKey: false }).auth()).text, /Not signed in/);
     sdk.Cursor.auth.state = { status: "logged-in", email: "dev@example.com", apiKeyExpiresAtMs: Date.UTC(2026, 11, 15) };
     assert.match((await newBridge(sdk, {}, { withKey: false }).auth({ action: "status" })).text, /Signed in with Cursor as dev@example\.com; its key expires 2026-12-15/);
@@ -294,7 +313,7 @@ describe("CursorBridge with a fake SDK", () => {
   test("models lists ids with params and the server default", async () => {
     const { sdk } = fakeSdk();
     const out = await newBridge(sdk, { CURSOR_BRIDGE_DEFAULT_MODEL: "grok-4.6:effort=high" }).models();
-    assert.match(out.text, /API key "test key" works/);
+    assert.match(out.text, /API key "test key" works \(from the CURSOR_API_KEY environment variable\)/);
     assert.match(out.text, /Server default model: grok-4\.6:effort=high/);
     assert.match(out.text, /- composer-2\.5: Composer 2\.5 \[fast=false\|true\]/);
   });
