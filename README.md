@@ -97,6 +97,13 @@ Models are written as `id` or `id:param=value,...`, for example `grok-4.6:effort
 - Cursor's usage API is not available on every account, so results report token counts rather than cost.
 - Some MCP clients time out long tool calls. Keep `wait_seconds` below the client's limit and use `cursor_wait` for longer runs. Claude Code 2.1.212 and later moves MCP calls that take over 2 minutes to the background.
 
+## Troubleshooting
+
+- **The cursor server fails to connect in your first session after installing.** Its dependencies (about 28 MB) may still be installing. Claude Code's automatic install stops after 60 seconds, and the server then installs them itself on its first start. Start a new session. If it still fails, run `npm ci --omit=dev` once in the plugin folder, `~/.claude/plugins/cache/cursor-bridge/cursor-bridge/<version>/`, and start a new session.
+- **The server reports that Node is too old.** Install Node.js 22.13 or newer, then start a new session.
+- **Authentication errors.** Ask Claude to run `cursor_auth`: `status` shows what is configured, `login` signs in with your Cursor account. Or set the API key in the plugin settings.
+- **A cloud run says the integration is not connected.** Connect GitHub (or your git host) in Cursor. The error includes a link to the right page.
+
 ## Development
 
 ```bash
